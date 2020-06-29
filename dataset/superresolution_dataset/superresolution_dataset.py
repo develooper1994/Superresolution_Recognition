@@ -18,7 +18,7 @@ def denormalize(tensors):
     return torch.clamp(tensors, 0, 255)
 
 
-class ImageDataset(Dataset):
+class ImageDataset_superresolution(Dataset):
     def __init__(self, root, hr_shape):
         hr_height, hr_width = hr_shape
         # Transforms for low resolution images and high resolution images

@@ -100,3 +100,8 @@ def decode_prediction(logits: torch.Tensor,
             if char != batch_token[idx - 1] or len(batch_token) == 1]
     text = ''.join(text)
     return text
+
+
+# Helper to count params
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)

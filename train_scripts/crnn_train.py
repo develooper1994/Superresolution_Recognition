@@ -19,18 +19,18 @@ try:
     from models import fully_conv_model
     from . import dataset, UFPR_ALPR_dataset
     from .crnn_evaluation import wer_eval, preds_to_integer, my_collate, AverageMeter
+    from utils import count_parameters
 except:
     from models import fully_conv_model
     from dataset import UFPR_ALPR_dataset
     from train_scripts.crnn_evaluation import wer_eval, preds_to_integer, my_collate, AverageMeter
+    from utils import count_parameters
 
 torch.manual_seed(0)
 plt.style.use('seaborn')
 
 
 # Helper to count params
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
 def train(epochs=5, batch_size=4, npa=1, lr=5e-4, eta_min=1e-6):

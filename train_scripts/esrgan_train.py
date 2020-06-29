@@ -10,6 +10,14 @@ Instrustion on running the script:
 
 import argparse
 import os
+from logging import error
+
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.autograd import Variable
+from torch.utils.data import DataLoader
+from torchvision.utils import save_image
 
 try:
     from dataset.superresolution_dataset.superresolution_dataset import *
@@ -47,9 +55,10 @@ parser.add_argument("--lambda_pixel", type=float, default=1e-2, help="pixel-wise
 opt = parser.parse_args()
 print(opt)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def esrgan(dataset_name=None, hr_height=None, hr_width=None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def esrgan(dataset_name=None, hr_height=None, hr_width=None, device=device):
     if hr_height is None:
         hr_height = opt.hr_height
     if hr_width is None:
@@ -76,7 +85,7 @@ def esrgan(dataset_name=None, hr_height=None, hr_width=None):
     if dataset_name is None:
         dataset_name = opt.dataset_name
     dataloader = DataLoader(
-        ImageDataset("../../data/%s" % dataset_name, hr_shape=hr_shape),
+        ImageDataset_superresolution("../../data/%s" % dataset_name, hr_shape=hr_shape),
         batch_size=opt.batch_size,
         shuffle=True,
         num_workers=opt.n_cpu,
