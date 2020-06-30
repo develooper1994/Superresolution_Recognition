@@ -12,7 +12,7 @@ def plot_loss(epoch: int,
               val_losses: list,
               n_steps: int = 100):
     """
-    Plots train and validation losses 
+    Plots __train and validation losses
     """
     # clear previous graph
     clear_output(True)

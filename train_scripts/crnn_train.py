@@ -38,12 +38,12 @@ def train(epochs=5, batch_size=4, npa=1, lr=5e-4, eta_min=1e-6):
     ## Set up Tensorboard writer for current test
     writer = SummaryWriter(log_dir="../logs")  # /home/leander/AI/repos/OCR-CNN/logs2/correct_cosine_2
     ## Model
-    model = fully_conv_model.cnn_attention_ocr(n_layers=8, nclasses=93, model_dim=64, input_dim=3)
-    model = model.to(device).train()
+    ocr_model = fully_conv_model.cnn_attention_ocr(n_layers=8, nclasses=93, model_dim=64, input_dim=3)
+    ocr_model = ocr_model.to(device).train()
     ctc_loss = nn.CTCLoss(blank=0, reduction="mean")
     ## Optimizer: Good initial is 5e5
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    cs = CosineAnnealingLR(optimizer=optimizer, T_max=250000, eta_min=eta_min)
+    ocr_optimizer = optim.Adam(ocr_model.parameters(), lr=lr)
+    ocr_cosine_learning_rate_scheduler = CosineAnnealingLR(optimizer=ocr_optimizer, T_max=250000, eta_min=eta_min)
     ## We keep track of the Average loss and CER
     ave_total_loss = AverageMeter()
     CER_total = AverageMeter()
@@ -54,11 +54,11 @@ def train(epochs=5, batch_size=4, npa=1, lr=5e-4, eta_min=1e-6):
         ToTensor()
     ])
     root = Path(r"D:\PycharmProjects\ocr_toolkit\UFPR-ALPR dataset")
-    ds = UFPR_ALPR_dataset(root, dataset_type="train", transform=transforms)
+    ds = UFPR_ALPR_dataset(root, dataset_type="__train", transform=transforms)
     trainset = DataLoader(ds, batch_size=batch_size)
     # testset = DataLoader(test_dataset, batch_size=batch_size)
 
-    print(count_parameters(model))
+    print(count_parameters(ocr_model))
 
     ## Train
     n_iter = 0
@@ -71,10 +71,10 @@ def train(epochs=5, batch_size=4, npa=1, lr=5e-4, eta_min=1e-6):
             if ge[0].shape[3] <= 800:
 
                 # DONT FORGET THE ZERO GRAD!!!!
-                optimizer.zero_grad()
+                ocr_optimizer.zero_grad()
 
                 # Get Predictions, permuted for CTC loss
-                log_probs = model(ge[0].to(device)).permute((2, 0, 1))
+                log_probs = ocr_model(ge[0].to(device)).permute((2, 0, 1))
 
                 # Targets have to be CPU for baidu loss
                 targets = ge[1].to(device)  # .cpu()
@@ -90,7 +90,7 @@ def train(epochs=5, batch_size=4, npa=1, lr=5e-4, eta_min=1e-6):
 
                 # Then backward and step
                 loss.backward()
-                optimizer.step()
+                ocr_optimizer.step()
 
                 # Save Loss in averagemeter and write to tensorboard
                 ave_total_loss.update(loss.data.item())
@@ -137,12 +137,12 @@ def train(epochs=5, batch_size=4, npa=1, lr=5e-4, eta_min=1e-6):
                 # We save when the new avereage CR is beloew the NPA
                 # npa>CER_total.average() and CER_total.average()>0 and CER_total.average()<1
                 if npa > CER_total.average() > 0 and CER_total.average() < 1:
-                    torch.save(model.state_dict(), "autosave.pt")
+                    torch.save(ocr_model.state_dict(), "autosave.pt")
                     npa = CER_total.average()
 
                 n_iter = n_iter + 1
-                cs.step()
-                lr = optimizer.param_groups[0]["lr"]
+                ocr_cosine_learning_rate_scheduler.step()
+                lr = ocr_optimizer.param_groups[0]["lr"]
                 writer.add_scalar("lr", lr, n_iter)
 
         summary_string = f"||epochs: {epochs}|> " \

@@ -54,24 +54,24 @@ class crnn_trainer(dl.Runner):
 
 if __name__ == "__main__":
     model = fully_conv_model.cnn_attention_ocr(n_layers=8, nclasses=93, model_dim=64, input_dim=3)
-    # cnn = cnn.cuda().train()
+    # cnn = cnn.cuda().__train()
     optimizer = optim.AdamW(model.parameters(), lr=0.02)
     ctc_loss = nn.CTCLoss(blank=0)
 
     num_epochs = 5
     batch_size = 10
-    # train_dataset = MNIST(root, train=False, download=True, transform=ToTensor())
-    # test_dataset = MNIST(root, train=False, download=True, transform=ToTensor())
+    # train_dataset = MNIST(root, __train=False, download=True, transform=ToTensor())
+    # test_dataset = MNIST(root, __train=False, download=True, transform=ToTensor())
     transforms = Compose([
         ToPILImage(),
         Resize((29, 73), Image.BICUBIC),
         ToTensor()
     ])
     root = Path(r"D:\PycharmProjects\ocr_toolkit\UFPR-ALPR dataset")
-    train_dataset = UFPR_ALPR_dataset(root, dataset_type="train", transform=transforms)
+    train_dataset = UFPR_ALPR_dataset(root, dataset_type="__train", transform=transforms)
     test_dataset = UFPR_ALPR_dataset(root, dataset_type="valid", transform=transforms)
     loaders = {
-        "train": DataLoader(train_dataset, batch_size=batch_size),
+        "__train": DataLoader(train_dataset, batch_size=batch_size),
         "valid": DataLoader(test_dataset, batch_size=batch_size),
     }
 

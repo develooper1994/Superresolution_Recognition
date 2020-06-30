@@ -1,1 +1,0 @@
-from .UFPR_ALPR_dataset import *
