@@ -43,7 +43,7 @@ class ImageDataset_superresolution(Dataset):
             self.files = root
 
     def __getitem__(self, index):
-        if isinstance(self.files, str):
+        if isinstance(self.files[index], str):
             img = Image.open(self.files[index % len(self.files)])
         else:
             img = self.files
