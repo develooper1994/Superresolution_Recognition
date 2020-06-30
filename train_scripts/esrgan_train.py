@@ -180,8 +180,8 @@ class esrgan:
                 loss_GAN = self.criterion_GAN(pred_fake - pred_real.mean(0, keepdim=True), valid)
 
                 # Content loss
-                gen_features = self.feature_extractor(gen_hr)
                 real_features = self.feature_extractor(imgs_hr).detach()
+                gen_features = self.feature_extractor(gen_hr)
                 loss_content = self.criterion_content(gen_features, real_features)  # L1Loss
 
                 # Total generator loss
