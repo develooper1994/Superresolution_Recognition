@@ -33,7 +33,7 @@ except:
 
 
 class esrgan:
-    def __init__(self, epoch=0, n_epochs=200, dataset_name="../dataset/TurkishPlates", batch_size=4, lr=0.0002, b1=0.9, b2=0.999, decay_epoch=100, n_cpu=8, hr_height=256, hr_width=256,
+    def __init__(self, epoch=0, n_epochs=200, dataset_name="../dataset/TurkishPlates", batch_size=3, lr=0.0002, b1=0.9, b2=0.999, decay_epoch=100, n_cpu=8, hr_height=256, hr_width=256,
                  channels=3, sample_interval=100, checkpoint_interval=100, residual_blocks=23, warmup_batches=500, lambda_adv=5e-3, lambda_pixel=1e-2):
         os.makedirs("images/training", exist_ok=True)
         os.makedirs("saved_models", exist_ok=True)
@@ -119,9 +119,9 @@ class esrgan:
         return discriminator, feature_extractor, generator
 
     def esrgan_losses(self):
-        criterion_GAN = torch.nn.BCEWithLogitsLoss().to(self.device)
-        criterion_content = torch.nn.L1Loss().to(self.device)
-        criterion_pixel = torch.nn.L1Loss().to(self.device)
+        criterion_GAN = torch.nn.BCEWithLogitsLoss()
+        criterion_content = torch.nn.L1Loss()
+        criterion_pixel = torch.nn.L1Loss()
         return criterion_GAN, criterion_content, criterion_pixel
 
     def esrga_optimizers(self):
@@ -147,8 +147,8 @@ class esrgan:
                 imgs_hr = imgs["hr"].to(self.device)
 
                 # Adversarial ground truths
-                valid = torch.ones((imgs_lr.size(0), *self.discriminator.output_shape), requires_grad=False)
-                fake = torch.ones((imgs_lr.size(0), *self.discriminator.output_shape), requires_grad=False)
+                valid = torch.ones((imgs_lr.size(0), *self.discriminator.output_shape), requires_grad=False).to(self.device)
+                fake = torch.zeros((imgs_lr.size(0), *self.discriminator.output_shape), requires_grad=False).to(self.device)
 
                 # ------------------
                 #  Train Generators
@@ -160,7 +160,7 @@ class esrgan:
                 gen_hr = self.generator(imgs_lr)
 
                 # Measure pixel-wise loss against ground truth
-                loss_pixel = self.criterion_pixel(gen_hr, imgs_hr)
+                loss_pixel = self.criterion_pixel(gen_hr, imgs_hr)  # L1Loss
 
                 if batches_done < self.opt.warmup_batches:
                     # Warm-up (pixel-wise loss only)
@@ -182,7 +182,7 @@ class esrgan:
                 # Content loss
                 gen_features = self.feature_extractor(gen_hr)
                 real_features = self.feature_extractor(imgs_hr).detach()
-                loss_content = self.criterion_content(gen_features, real_features)  # after many epochs throws an exception. some data has to be be inside of cpu cache. I don't know what? and why?.
+                loss_content = self.criterion_content(gen_features, real_features)  # L1Loss
 
                 # Total generator loss
                 loss_G = loss_content + self.opt.lambda_adv * loss_GAN + self.opt.lambda_pixel * loss_pixel
@@ -194,16 +194,16 @@ class esrgan:
                 #  Train Discriminator
                 # ---------------------
 
-                loss_D = self.train_discriminator(fake, gen_hr, imgs_hr, valid)
+                loss_D = self.train_discriminator(gen_hr, imgs_hr, fake, valid)
 
                 # --------------
                 #  Log Progress
                 # --------------
 
-                self.__log_progress(batches_done, epoch, gen_hr, i, imgs_lr, loss_D, loss_G, loss_GAN, loss_content,
+                self.__log_progress(i, batches_done, epoch, gen_hr, imgs_lr, loss_D, loss_G, loss_GAN, loss_content,
                                     loss_pixel)
 
-    def train_discriminator(self, fake, gen_hr, imgs_hr, valid):
+    def train_discriminator(self, gen_hr, imgs_hr, fake, valid):
         self.optimizer_D.zero_grad()
         pred_real = self.discriminator(imgs_hr)
         pred_fake = self.discriminator(gen_hr.detach())
@@ -216,7 +216,7 @@ class esrgan:
         self.optimizer_D.step()
         return loss_D
 
-    def __log_progress(self, batches_done, epoch, gen_hr, i, imgs_lr, loss_D, loss_G, loss_GAN, loss_content,
+    def __log_progress(self, i, batches_done, epoch, gen_hr, imgs_lr, loss_D, loss_G, loss_GAN, loss_content,
                        loss_pixel):
         print(
             "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, content: %f, adv: %f, pixel: %f]"
