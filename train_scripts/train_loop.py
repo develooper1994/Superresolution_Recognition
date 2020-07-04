@@ -70,7 +70,7 @@ class train_loop(metaclass=ABCMeta):
             batch_size=self.opt.batch_size,
             num_workers=self.opt.n_cpu,
             shuffle=True,
-            pin_memory=True
+            pin_memory=True,
         )
 
     @abstractmethod
@@ -110,7 +110,7 @@ class train_loop(metaclass=ABCMeta):
         return opt
 
     def network_initializers(self, hr_shape):
-        use_LeakyReLU_Mish = True
+        use_LeakyReLU_Mish = False
         generator = GeneratorRRDB(self.opt.channels, filters=64, num_res_blocks=self.opt.residual_blocks,
                                   use_LeakyReLU_Mish=use_LeakyReLU_Mish).to(self.device, non_blocking=True)
         discriminator = Discriminator(input_shape=(self.opt.channels, *hr_shape),

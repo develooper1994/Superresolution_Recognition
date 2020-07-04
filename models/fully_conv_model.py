@@ -1,11 +1,13 @@
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torchvision.models as models
 
-import numpy as np
-
 from torch.nn.modules.normalization import LayerNorm, LocalResponseNorm
 from torch.nn import BatchNorm2d, MaxPool2d
+
+from timm.models.layers import Mish
 
 # This tells us which dimension we want to layernomalize over, by default, if we give it one value it will normalize over the
 # channels dimension, it has to be a fixed dimension, so the only alternative is if we would use the the height to normalize, we can try tht by exchanging the last two dimnsions like this (0,1,3,2)
@@ -54,6 +56,7 @@ class attention_block(nn.Module):
         self.reduce3 = nn.Conv2d(reduce_dim, output_channels, kernel_size=1)
         self.conv2 = depthwise_separable_conv_bn(output_channels, output_channels)
         self.el2 = nn.ELU()
+        self.MISH = Mish()
 
         w = reduce_dim
         # elementwise affine true means we learn if we want to normalize, false we always normalize
@@ -67,7 +70,8 @@ class attention_block(nn.Module):
 
         x = self.reduce1(input)
         x = self.conv1(x)
-        x = self.el(x)
+        # x = self.el(x)
+        x = self.MISH(x)
 
         x = self.ln_1(x.permute(chan_norm)).permute(chan_norm)
 
@@ -84,7 +88,8 @@ class attention_block(nn.Module):
         x = self.ln_5(atn.permute(chan_norm)).permute(chan_norm)
         x = self.reduce3(x)
         x = self.conv2(x)
-        x = self.el2(x)
+        # x = self.el2(x)
+        x = self.MISH(x)
 
         # If we want to use it to change the dimension
         if self.residual == True:

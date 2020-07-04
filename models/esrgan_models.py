@@ -116,13 +116,13 @@ class Discriminator(nn.Module):
             if use_LeakyReLU_Mish:
                 layers.append(nn.LeakyReLU(0.2, inplace=True))
             else:
-                layers.append(self.MISH())
+                layers.append(self.MISH)
             layers.append(nn.Conv2d(out_filters, out_filters, kernel_size=3, stride=2, padding=1))
             layers.append(nn.BatchNorm2d(out_filters))
             if use_LeakyReLU_Mish:
                 layers.append(nn.LeakyReLU(0.2, inplace=True))
             else:
-                layers.append(self.MISH())
+                layers.append(self.MISH)
             return layers
 
         layers = []

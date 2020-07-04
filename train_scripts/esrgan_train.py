@@ -22,7 +22,7 @@ from dataset.superresolution_dataset.superresolution_dataset import denormalize
 class esrgan(train_loop):
 
     def __call__(self, *args, **kwargs):
-        return self.esrgan_train()
+        self.esrgan_train()
 
     def esrgan_train(self):
         if self.opt.epoch != 0:
@@ -115,8 +115,7 @@ class esrgan(train_loop):
 
     def __log_progress(self, i, batches_done, epoch, gen_hr, imgs_lr, loss_D, loss_G, loss_GAN, loss_content,
                        loss_pixel):
-        print(
-            "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, content: %f, adv: %f, pixel: %f]"
+        self.summary_string = "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, content: %f, adv: %f, pixel: %f]"\
             % (
                 epoch,
                 self.opt.n_epochs,
@@ -128,7 +127,7 @@ class esrgan(train_loop):
                 loss_GAN.item(),
                 loss_pixel.item(),
             )
-        )
+        print(self.summary_string)
         if batches_done % self.opt.sample_interval == 0:
             # Save image grid with upsampled inputs and ESRGAN outputs
             imgs_lr = nn.functional.interpolate(imgs_lr, scale_factor=4)

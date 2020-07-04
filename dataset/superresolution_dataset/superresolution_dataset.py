@@ -1,12 +1,12 @@
 import glob
 
-import albumentations
 import cv2
 import numpy as np
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
 from torch.utils.data import Dataset
+import albumentations
 from albumentations import (
     HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
     Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
@@ -67,14 +67,14 @@ class ImageDataset_superresolution(Dataset):
         ## Albumentation
         self.lr_transform = albumentations.Compose([
             Resize(hr_height // 4, hr_height // 4),
-            Normalize(),
-            ToTensor(mean, std),
+            Normalize(mean, std),
+            ToTensor(),
         ])
 
         self.hr_transform = albumentations.Compose([
             Resize(hr_height, hr_height),
-            Normalize(),
-            ToTensor(mean, std),
+            Normalize(mean, std),
+            ToTensor(),
         ])
 
         if isinstance(root, str):

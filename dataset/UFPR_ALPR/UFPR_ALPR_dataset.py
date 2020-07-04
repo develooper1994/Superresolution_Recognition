@@ -77,7 +77,8 @@ class UFPR_ALPR_dataset(Dataset):
         # assert not item > len(self.images), "!!! index access exceeded !!!"
         images = self.images[item]
         if self.transform is not None:
-            images = self.transform(images)
+            # params.update({"cols": kwargs["image"].shape[1], "rows": kwargs["image"].shape[0]})
+            images = self.transform(image=np.array(images))['image']
 
         parsed_metadatas = self.parsed_metadatas[item]
         if isinstance(item, int):
@@ -190,6 +191,8 @@ class UFPR_ALPR_dataset(Dataset):
         image = cv2.imread(image_path)
         if crop_plate:
             image = self._crop_plate_func(image, plate_and_position)
+        # if self.transform is not None:
+        #     image = self.transform(image=image)  # ['image']
         self.images.append(image)
 
     def write_crop_plate_func(self, image, position_plate):
