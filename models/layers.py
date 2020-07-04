@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from timm.models.layers import Mish
+
 
 class blockCNN(nn.Module):
     def __init__(self, in_nc, out_nc, kernel_size, padding, stride=1):
@@ -16,8 +18,9 @@ class blockCNN(nn.Module):
                               stride=stride,
                               padding=padding)
         self.bn = nn.BatchNorm2d(out_nc)
+        self.MISH = Mish()
 
-    def forward(self, batch, use_bn=False, use_relu=False,
+    def forward(self, batch, use_bn=False, use_relu_mish=False,
                 use_maxpool=False, maxpool_kernelsize=None):
         """
             in:
@@ -28,8 +31,10 @@ class blockCNN(nn.Module):
         batch = self.conv(batch)
         if use_bn:
             batch = self.bn(batch)
-        if use_relu:
+        if use_relu_mish:
             batch = F.relu(batch)
+        else:
+            batch = self.MISH(batch)
         if use_maxpool:
             assert maxpool_kernelsize is not None
             batch = F.max_pool2d(batch, kernel_size=maxpool_kernelsize, stride=2)
