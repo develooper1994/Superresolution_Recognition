@@ -1,6 +1,7 @@
 import random
 
 from PIL import Image, ImageFilter
+
 try:
     from .background_generator import BackgroundGenerator
     from .computer_text_generator import ComputerTextGenerator

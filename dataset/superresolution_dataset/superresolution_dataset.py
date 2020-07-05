@@ -3,19 +3,11 @@ import glob
 import cv2
 import numpy as np
 import torch
-import torchvision.transforms as transforms
-from PIL import Image
-from torch.utils.data import Dataset
-import albumentations
 from albumentations import (
-    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
-    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
-    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, IAAPiecewiseAffine,
-    IAASharpen, IAAEmboss, RandomBrightnessContrast, RandomCrop, Flip, OneOf, Compose, Resize, Normalize
+    Compose, Resize, Normalize
 )
 from albumentations.pytorch import ToTensor
-
-import kornia
+from torch.utils.data import Dataset
 
 # Normalization parameters for pre-trained PyTorch models
 mean = np.array([0.485, 0.456, 0.406])
@@ -67,13 +59,13 @@ class ImageDataset_superresolution(Dataset):
         # )
 
         ## Albumentation
-        self.lr_transform = albumentations.Compose([
+        self.lr_transform = Compose([
             Resize(hr_height // 4, hr_height // 4),
             Normalize(mean, std),
             ToTensor(),
         ])
 
-        self.hr_transform = albumentations.Compose([
+        self.hr_transform = Compose([
             Resize(hr_height, hr_height),
             Normalize(mean, std),
             ToTensor(),

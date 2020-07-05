@@ -1,8 +1,6 @@
 import collections
 
 import torch
-import torch.nn as nn
-from numpy import mean
 
 
 class strLabelConverter(object):

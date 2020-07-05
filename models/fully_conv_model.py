@@ -1,13 +1,8 @@
-import numpy as np
-
 import torch
 import torch.nn as nn
-import torchvision.models as models
-
-from torch.nn.modules.normalization import LayerNorm, LocalResponseNorm
-from torch.nn import BatchNorm2d, MaxPool2d
-
 from timm.models.layers import Mish
+from torch.nn import BatchNorm2d, MaxPool2d
+from torch.nn.modules.normalization import LayerNorm
 
 # This tells us which dimension we want to layernomalize over, by default, if we give it one value it will normalize over the
 # channels dimension, it has to be a fixed dimension, so the only alternative is if we would use the the height to normalize, we can try tht by exchanging the last two dimnsions like this (0,1,3,2)

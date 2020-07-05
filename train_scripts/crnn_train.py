@@ -1,22 +1,21 @@
 # standart modules
 import argparse
 import os
-from path import Path
 
 import numpy as np
-import cv2
-# import matplotlib.pyplot as plt
-
 # torch modules
 import torch
+from PIL import Image
+from albumentations.pytorch import ToTensor
+from path import Path
 from torch import optim, nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, Compose, ToPILImage, Resize
 from torchvision.utils import save_image
-import albumentations
-from albumentations.pytorch import ToTensor
+
+# import matplotlib.pyplot as plt
 
 ## my modules
 try:
@@ -176,9 +175,11 @@ class crnn(train_loop):
         os.makedirs("ocr_images/training", exist_ok=True)
         os.makedirs("ocr_saved/models", exist_ok=True)
 
-        self.reload(b1, b2, batch_size, channels, checkpoint_interval, dataset_name, decay_epoch, epoch, eta_min,
-                    hr_height, hr_width, lambda_adv, lambda_pixel, lr, n_cpu, n_epochs, npa, residual_blocks,
-                    sample_interval, warmup_batches)
+        self.reload(epoch=epoch, n_epochs=n_epochs, dataset_name=dataset_name, batch_size=batch_size, npa=npa, lr=lr,
+                    eta_min=eta_min, b1=b1, b2=b2, decay_epoch=decay_epoch, n_cpu=n_cpu, hr_height=hr_height,
+                    hr_width=hr_width, channels=channels, sample_interval=sample_interval,
+                    checkpoint_interval=checkpoint_interval, residual_blocks=residual_blocks,
+                    warmup_batches=warmup_batches, lambda_adv=lambda_adv, lambda_pixel=lambda_pixel)
 
     def __call__(self, *args, **kwargs):
         self.crnn_train()
@@ -209,15 +210,15 @@ class crnn(train_loop):
         self.ave_total_loss = AverageMeter()
         self.CER_total = AverageMeter()
         ## Dataset
-        self.transforms = albumentations.Compose([
-            albumentations.Resize(29, 73, interpolation=cv2.INTER_CUBIC),
-            ToTensor(),
-        ])
-        # self.transforms = Compose([
-        #     ToPILImage(),
-        #     Resize((29, 73), Image.BICUBIC),
-        #     ToTensor()
+        # self.transforms = albumentations.Compose([
+        #     albumentations.Resize(29, 73, interpolation=cv2.INTER_CUBIC),
+        #     ToTensor(),
         # ])
+        self.transforms = Compose([
+            ToPILImage(),
+            Resize((29, 73), Image.BICUBIC),
+            ToTensor()
+        ])
         root = Path(self.opt.dataset_name)
         self.dataset = UFPR_ALPR_dataset(root, dataset_type="__train", transform=self.transforms)
         self.dataloader = DataLoader(

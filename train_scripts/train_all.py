@@ -1,57 +1,41 @@
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=DeprecationWarning)
+warnings.simplefilter(action='ignore', category=UserWarning)
+warnings.simplefilter("ignore")
+warnings.filterwarnings("ignore")
+
 import argparse
 import os
 
-import albumentations
-import cv2
-from path import Path
-
 import numpy as np
-from PIL import Image
-
 # torch modules
 import torch
+from PIL import Image
+from path import Path
 from torch import optim, nn
-from torch.utils.data import DataLoader
-from torchfun import count_parameters
-from torchvision.transforms import Resize, ToPILImage, ToTensor, Compose
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from torchfun import count_parameters
+from torchvision.transforms import transforms
 from torchvision.utils import save_image
 
-## my modules
-from train_scripts.crnn_train import crnn
-from train_scripts.esrgan_train import esrgan
-from dataset.superresolution_dataset.superresolution_dataset import ImageDataset_superresolution, denormalize
-from models.esrgan_models import FeatureExtractor, DenseResidualBlock, ResidualInResidualDenseBlock, GeneratorRRDB, \
-    Discriminator
-from models import fully_conv_model
 from dataset import UFPR_ALPR_dataset
-from train_scripts.crnn_evaluation import wer_eval, preds_to_integer, my_collate, AverageMeter
+## my modules
+from dataset.superresolution_dataset.superresolution_dataset import denormalize
+from models import fully_conv_model
+from models.esrgan_models import FeatureExtractor, GeneratorRRDB, \
+    Discriminator
+from train_scripts.crnn_evaluation import wer_eval, preds_to_integer, AverageMeter
 
 
-# try:
-#     from train_scripts.esrgan_train import crnn, esrgan
-#     from dataset.superresolution_dataset.superresolution_dataset import ImageDataset_superresolution, denormalize
-#     from models.esrgan_models import FeatureExtractor, DenseResidualBlock, ResidualInResidualDenseBlock, GeneratorRRDB, \
-#         Discriminator
-#     from models import fully_conv_model
-#     from . import dataset, UFPR_ALPR_dataset
-#     from .crnn_evaluation import wer_eval, preds_to_integer, my_collate, AverageMeter
-# except:
-#     from .esrgan_train import crnn, esrgan
-#     from .superresolution_dataset.superresolution_dataset import ImageDataset_superresolution, denormalize
-#     from .esrgan_models import FeatureExtractor, DenseResidualBlock, ResidualInResidualDenseBlock, GeneratorRRDB, \
-#         Discriminator
-#     from .models import fully_conv_model
-#     from dataset import UFPR_ALPR_dataset
-#     from .crnn_evaluation import wer_eval, preds_to_integer, my_collate, AverageMeter
-
-
+warmup_batches=500
 class esrgan_crnn:
     def __init__(self, epoch=0, n_epochs=200, dataset_name=r"D:\PycharmProjects\ocr_toolkit\UFPR-ALPR dataset",
                  batch_size=4, npa=1, lr=0.0002, eta_min=1e-6, b1=0.9, b2=0.999, decay_epoch=100, n_cpu=8, hr_height=32,
                  hr_width=80, channels=3, sample_interval=100, checkpoint_interval=100, residual_blocks=23,
-                 warmup_batches=500, lambda_adv=5e-3, lambda_pixel=1e-2):
+                 warmup_batches=0, lambda_adv=5e-3, lambda_pixel=1e-2):
         os.makedirs("ocr_images/training", exist_ok=True)
         os.makedirs("ocr_saved/models", exist_ok=True)
 
@@ -95,19 +79,38 @@ class esrgan_crnn:
         ## esrgan
         mean = np.array([0.485, 0.456, 0.406])
         std = np.array([0.229, 0.224, 0.225])
-        self.lr_crnn_transforms = albumentations.Compose([
-            albumentations.Resize(self.opt.hr_height // 4, self.opt.hr_width // 4),
-            albumentations.Normalize(mean, std),
-            ToTensor(),
-        ])
-        self.hr_crnn_transforms = albumentations.Compose([
-            albumentations.Resize(self.opt.hr_height, self.opt.hr_width, interpolation=cv2.INTER_CUBIC),
-            albumentations.Normalize(mean, std),
-            ToTensor(),
-        ])
+        # self.lr_crnn_transforms = albumentations.Compose([
+        #     albumentations.Resize(self.opt.hr_height // 4, self.opt.hr_width // 4),
+        #     albumentations.Normalize(mean, std),
+        #     ToTensor(),
+        # ])
+        # self.hr_crnn_transforms = albumentations.Compose([
+        #     albumentations.Resize(self.opt.hr_height, self.opt.hr_width, interpolation=cv2.INTER_CUBIC),
+        #     albumentations.Normalize(mean, std),
+        #     ToTensor(),
+        # ])
+        ## torchvision
+        self.lr_crnn_transforms = transforms.Compose(
+            [
+                transforms.ToPILImage(),
+                transforms.Resize((hr_height // 4, hr_height // 4), Image.BICUBIC),
+                transforms.ToTensor(),
+                transforms.Normalize(mean, std),
+            ]
+        )
+        self.hr_crnn_transforms = transforms.Compose(
+            [
+                transforms.ToPILImage(),
+                transforms.Resize((hr_height, hr_height), Image.BICUBIC),
+                transforms.ToTensor(),
+                transforms.Normalize(mean, std),
+            ]
+        )
         root = Path(self.opt.dataset_name)
+        index_maximum = 10
         self.lr_crnn_dataset = UFPR_ALPR_dataset(data_path=root, dataset_type="__train",
-                                                 transform=self.lr_crnn_transforms)
+                                                 transform=self.lr_crnn_transforms,
+                                                 index_maximum=index_maximum)
         self.lr_crnn_dataloader = DataLoader(
             self.lr_crnn_dataset,
             batch_size=self.opt.batch_size,
@@ -116,7 +119,8 @@ class esrgan_crnn:
             pin_memory=True,
         )
         self.hr_crnn_dataset = UFPR_ALPR_dataset(data_path=root, dataset_type="__train",
-                                                 transform=self.hr_crnn_transforms)
+                                                 transform=self.hr_crnn_transforms,
+                                                 index_maximum=index_maximum)
         self.hr_crnn_dataloader = DataLoader(
             self.hr_crnn_dataset,
             batch_size=self.opt.batch_size,
@@ -126,18 +130,6 @@ class esrgan_crnn:
         )
         # testset = DataLoader(test_dataset, batch_size=batch_size)
         print("Number of parameters of OCR model", count_parameters(self.ocr_model))
-
-        ## esrgan
-        # # Data
-        # # The most problematic part. If doesn't work use lr and hr transforms inside of this class
-        # self.superres_dataset = ImageDataset_superresolution(device=self.device, root=self.opt.dataset_name, hr_shape=hr_shape)  # self.crnn_dataset into this dataset.
-        # self.superres_dataloader = DataLoader(
-        #     self.superres_dataset,
-        #     batch_size=self.opt.batch_size,
-        #     num_workers=self.opt.n_cpu,
-        #     shuffle=True,
-        #     pin_memory=True,
-        # )
 
     def network_initializers(self, hr_shape, use_LeakyReLU_Mish=False):
         ## ocr
@@ -222,7 +214,7 @@ class esrgan_crnn:
         max_elem, max_preds, max_target = 0, 0, 0
         for epoch in range(self.opt.epoch, self.opt.n_epochs):
             print("Epoch:", epoch, "started")
-            for i, ge_lr, ge_hr in enumerate(zip(self.lr_crnn_dataloader, self.hr_crnn_dataloader)):
+            for i, (ge_lr, ge_hr) in enumerate(zip(self.lr_crnn_dataloader, self.hr_crnn_dataloader)):
                 batches_done = epoch * len(self.lr_crnn_dataloader) + i
                 images_lr, plate_encoded, images_len, plate_encoded_len = ge_lr
                 images_hr, plate_encoded, images_len, plate_encoded_len = ge_hr
@@ -231,12 +223,6 @@ class esrgan_crnn:
                 imgs_hr = images_hr.to(self.device, non_blocking=True)
                 plate_encoded = plate_encoded.to(self.device, non_blocking=True)
                 if imgs_lr.shape[3] <= 800 and imgs_hr.shape[3] <= 800:
-                    # Adversarial ground truths
-                    valid = torch.ones((imgs_lr.size(0), *self.discriminator.output_shape), requires_grad=False).to(
-                        self.device, non_blocking=True)
-                    fake = torch.zeros((imgs_lr.size(0), *self.discriminator.output_shape), requires_grad=False).to(
-                        self.device, non_blocking=True)
-
                     # ------------------
                     #  Train Generators
                     # ------------------
@@ -244,11 +230,6 @@ class esrgan_crnn:
 
                     # Generate a high resolution image from low resolution input
                     gen_hr = self.generator(imgs_lr)
-
-                    # optimize ocr_model
-                    n_iter, input_lengths, ocr_loss, log_probs, targets, wer_list, max_elem, max_preds, max_target = \
-                        self.ocr_one_batch(batches_done, epoch, gen_hr, images_len, max_elem, max_preds,
-                                           max_target, n_iter, npa, plate_encoded, plate_encoded_len)
 
                     # Measure pixel-wise loss against ground truth
                     loss_pixel = self.criterion_pixel(gen_hr, imgs_hr)  # L1Loss
@@ -259,13 +240,25 @@ class esrgan_crnn:
                         self.optimizer_G.step()
                         print(
                             "[Epoch %d/%d] [Batch %d/%d] [G pixel: %f]"
-                            % (epoch, self.opt.n_epochs, i, len(self.dataloader), loss_pixel.item())
+                            % (epoch, self.opt.n_epochs, i, len(self.hr_crnn_dataloader), loss_pixel.item())
                         )
                         continue
 
+                    # TODO! RuntimeError: Trying to backward through the graph a second time, but the buffers have already been freed. Specify retain_graph=True when calling backward the first time.
+                    gen_hr.detach_()  # problem is graph is removed from memory. It is looks like Pytorch bug! I can't go further without detach it.
                     # Extract validity predictions from discriminator
                     pred_real = self.discriminator(imgs_hr).detach()
                     pred_fake = self.discriminator(gen_hr)
+
+                    # Adversarial ground truths
+                    # valid = torch.ones((imgs_lr.size(0), *self.discriminator.output_shape), requires_grad=False).to(
+                    #     self.device, non_blocking=True)
+                    # fake = torch.zeros((imgs_lr.size(0), *self.discriminator.output_shape), requires_grad=False).to(
+                    #     self.device, non_blocking=True)
+                    valid = torch.ones((imgs_lr.size(0), *pred_real.shape[1:]), requires_grad=False).to(
+                        self.device, non_blocking=True)
+                    fake = torch.zeros((imgs_lr.size(0), *pred_fake.shape[1:]), requires_grad=False).to(
+                        self.device, non_blocking=True)
 
                     # Adversarial loss (relativistic average GAN)
                     loss_GAN = self.criterion_GAN(pred_fake - pred_real.mean(0, keepdim=True), valid)
@@ -275,10 +268,18 @@ class esrgan_crnn:
                     gen_features = self.feature_extractor(gen_hr)
                     loss_content = self.criterion_content(gen_features, real_features)  # L1Loss
 
-                    # Total generator loss
-                    loss_G = loss_content + self.opt.lambda_adv * loss_GAN + self.opt.lambda_pixel * loss_pixel \
-                             + ocr_loss
+                    # OCR optimizer
+                    # optimize ocr_model
+                    # hidden_gen_hr = Variable(gen_hr.data, requires_grad=True)  # prevent "...buffers have already been freed..." error.
+                    n_iter, input_lengths, ocr_loss, log_probs, targets, wer_list, max_elem, max_preds, max_target = \
+                        self.ocr_one_batch(batches_done, epoch, gen_hr, images_len, max_elem, max_preds,
+                                           max_target, n_iter, npa, plate_encoded, plate_encoded_len)
+                    ocr_loss.backward()
+                    self.ocr_optimizer.step()
 
+                    # Total generator loss
+                    loss_G = loss_content + self.opt.lambda_adv * loss_GAN + self.opt.lambda_pixel * loss_pixel
+                    # loss_G += ocr_loss  # with ocr entegration.
                     loss_G.backward()
                     self.optimizer_G.step()
 
@@ -295,9 +296,59 @@ class esrgan_crnn:
                     # self.__esrgan_log_progress(i, batches_done, epoch, gen_hr, imgs_lr, loss_D, loss_G, loss_GAN,
                     #                            loss_content,
                     #                            loss_pixel)
-                    self.__log_progress(self, i, batches_done, epoch, gen_hr, imgs_lr, loss_D, loss_G, loss_GAN,
-                                        loss_content, loss_pixel, ocr_loss, max_target, max_preds, max_elem, n_iter,
-                                        npa, wer_list=wer_list)
+
+                    # log the all progress
+                    self.ave_total_loss.update(ocr_loss.data.item())
+                    self.writer.add_scalar("total_loss", self.ave_total_loss.average(), n_iter)
+                    if np.average(wer_list) > 0.1:
+                        # Save Loss in averagemeter and write to tensorboard
+                        self.writer.add_text("label", max_target, n_iter)
+                        self.writer.add_text("pred", max_preds, n_iter)
+                        self.writer.add_image("img", gen_hr[max_elem].detach().cpu().numpy(), n_iter)
+
+                        # gen.close()
+                        # break
+                    # Might become infinite
+                    if np.average(wer_list) < 10:
+                        self.CER_total.update(np.average(wer_list))
+                        self.writer.add_scalar("CER", self.CER_total.average(), n_iter)
+                    # We save when the new avereage CR is beloew the NPA
+                    # npa>CER_total.average() and CER_total.average()>0 and CER_total.average()<1
+                    if npa > self.CER_total.average() > 0 and self.CER_total.average() < 1:
+                        torch.save(self.ocr_model.state_dict(), "ocr_autosave.pt")
+                        npa = self.CER_total.average()
+                    n_iter = n_iter + 1
+                    self.ocr_cosine_learning_rate_scheduler.step()
+                    lr = self.ocr_optimizer.param_groups[0]["lr"]
+                    self.writer.add_scalar("lr", lr, n_iter)
+                    # Save result checkpoints
+                    if batches_done % self.opt.sample_interval == 0:
+                        save_image(gen_hr[max_elem], "ocr_images/training/%d.png" % batches_done, nrow=1,
+                                   normalize=False)
+                    # Save model checkpoints
+                    if batches_done % self.opt.checkpoint_interval == 0:
+                        torch.save(self.ocr_model.state_dict(), "ocr_saved/models/ocr_model_%d.pth" % epoch)
+
+                    self.summary_string = f"[Epoch {epoch}/{self.opt.n_epochs}] " \
+                                          f"[Batch {i}/{len(self.hr_crnn_dataloader)}] " \
+                                          f"[D loss: {loss_D.item()}] " \
+                                          f"[G loss: {loss_G.item()}, content: {loss_content.item()}, adv: {loss_GAN.item()}, " f"pixel: {loss_pixel.item()}] " \
+                                          f"[OCR loss: {ocr_loss.data.item()}]" \
+                                          f"[max_target: {max_target}] " \
+                                          f"[max_preds: {max_preds}] " \
+                                          f"[Average CER total: {self.CER_total.average()}] " \
+                                          f"[Average ave_total_loss: {self.ave_total_loss.average()}] "
+                    print(self.summary_string)
+
+                    if batches_done % self.opt.sample_interval == 0:
+                        # Save image grid with upsampled inputs and ESRGAN outputs
+                        imgs_lr = nn.functional.interpolate(imgs_lr, scale_factor=4)
+                        img_grid = denormalize(torch.cat((imgs_lr, gen_hr), -1))
+                        save_image(img_grid, "images/training/%d.png" % batches_done, nrow=1, normalize=False)
+                    if batches_done % self.opt.checkpoint_interval == 0:
+                        # Save model checkpoints
+                        torch.save(self.generator.state_dict(), "saved_models/generator_%d.pth" % epoch)
+                        torch.save(self.discriminator.state_dict(), "saved_models/discriminator_%d.pth" % epoch)
 
     def __ocr_log_progress2(self, batches_done, epoch, images, ocr_loss, max_elem, max_preds, max_target, n_iter, npa,
                             wer_list):
@@ -332,45 +383,6 @@ class esrgan_crnn:
             torch.save(self.ocr_model.state_dict(), "ocr_saved/models/ocr_model_%d.pth" % epoch)
         return npa, n_iter
 
-    def __log_progress(self, i, batches_done, epoch, gen_hr, imgs_lr, loss_D, loss_G, loss_GAN, loss_content,
-                       loss_pixel, ocr_loss, max_target, max_preds, max_elem, n_iter, npa, wer_list):
-
-        npa, n_iter = self.__ocr_log_progress2(batches_done, epoch, gen_hr, ocr_loss, max_elem, max_preds, max_target,
-                                               n_iter, npa, wer_list)
-        self.summary_string = f"[Epoch {epoch}/{self.opt.n_epochs}] " \
-                              f"[Batch {i}/{len(self.dataloader)}] " \
-                              f"[D loss: {loss_D.item()}] " \
-                              f"[G loss: {loss_G.item()}, content: {loss_content.item()}, adv: {loss_GAN.item()}, " f"pixel: {loss_pixel.item()}] " \
-                              f"[OCR loss: {ocr_loss.data.item()}]" \
-                              f"[max_target: {max_target}] " \
-                              f"[max_preds: {max_preds}] " \
-                              f"[Average CER total: {self.CER_total.average()}] " \
-                              f"[Average ave_total_loss: {self.ave_total_loss.average()}] "
-        print(self.summary_string)
-
-        self.__esrgan_log_progress2(i, batches_done, epoch, gen_hr, imgs_lr, loss_D, loss_G, loss_GAN, loss_content,
-                                    loss_pixel)
-        return npa, n_iter
-
-    def __esrgan_log_progress(self, i, batches_done, epoch, gen_hr, imgs_lr, loss_D, loss_G, loss_GAN, loss_content,
-                              loss_pixel):
-        self.summary_string = f"[Epoch {epoch}/{self.opt.n_epochs}] " \
-                              f"[Batch {i}/{len(self.dataloader)}] " \
-                              f"[D loss: {loss_D.item()}] " \
-                              f"[G loss: {loss_G.item()}, content: {loss_content.item()}, adv: {loss_GAN.item()}, " \
-                              f"pixel: {loss_pixel.item()}]"
-
-        print(self.summary_string)
-        if batches_done % self.opt.sample_interval == 0:
-            # Save image grid with upsampled inputs and ESRGAN outputs
-            imgs_lr = nn.functional.interpolate(imgs_lr, scale_factor=4)
-            img_grid = denormalize(torch.cat((imgs_lr, gen_hr), -1))
-            save_image(img_grid, "images/training/%d.png" % batches_done, nrow=1, normalize=False)
-        if batches_done % self.opt.checkpoint_interval == 0:
-            # Save model checkpoints
-            torch.save(self.generator.state_dict(), "saved_models/generator_%d.pth" % epoch)
-            torch.save(self.discriminator.state_dict(), "saved_models/discriminator_%d.pth" % epoch)
-
     def __esrgan_log_progress2(self, i, batches_done, epoch, gen_hr, imgs_lr, loss_D, loss_G, loss_GAN, loss_content,
                                loss_pixel):
         if batches_done % self.opt.sample_interval == 0:
@@ -382,49 +394,6 @@ class esrgan_crnn:
             # Save model checkpoints
             torch.save(self.generator.state_dict(), "saved_models/generator_%d.pth" % epoch)
             torch.save(self.discriminator.state_dict(), "saved_models/discriminator_%d.pth" % epoch)
-
-    def __ocr_log_progress(self, batches_done, epoch, images, ocr_loss, max_elem, max_preds, max_target, n_iter, npa,
-                           wer_list):
-        self.ave_total_loss.update(ocr_loss.data.item())
-        self.writer.add_scalar("total_loss", self.ave_total_loss.average(), n_iter)
-        if np.average(wer_list) > 0.1:
-            # Save Loss in averagemeter and write to tensorboard
-            self.writer.add_text("label", max_target, n_iter)
-            self.writer.add_text("pred", max_preds, n_iter)
-            self.writer.add_image("img", images[max_elem].detach().cpu().numpy(), n_iter)
-
-            # gen.close()
-            # break
-        # Might become infinite
-        if np.average(wer_list) < 10:
-            self.CER_total.update(np.average(wer_list))
-            self.writer.add_scalar("CER", self.CER_total.average(), n_iter)
-        # We save when the new avereage CR is beloew the NPA
-        # npa>CER_total.average() and CER_total.average()>0 and CER_total.average()<1
-        if npa > self.CER_total.average() > 0 and self.CER_total.average() < 1:
-            torch.save(self.ocr_model.state_dict(), "ocr_autosave.pt")
-            npa = self.CER_total.average()
-        n_iter = n_iter + 1
-        self.ocr_cosine_learning_rate_scheduler.step()
-        lr = self.ocr_optimizer.param_groups[0]["lr"]
-        self.writer.add_scalar("lr", lr, n_iter)
-        # Save result checkpoints
-        if batches_done % self.opt.sample_interval == 0:
-            save_image(images[max_elem], "ocr_images/training/%d.png" % batches_done, nrow=1, normalize=False)
-        # Save model checkpoints
-        if batches_done % self.opt.checkpoint_interval == 0:
-            torch.save(self.ocr_model.state_dict(), "ocr_saved/models/ocr_model_%d.pth" % epoch)
-
-        self.summary_string = \
-            f"||epoch: {epoch}|> " \
-            f"||n_iter: {n_iter}|> " \
-            f"||Loss: {ocr_loss.data.item()}|> " \
-            f"||max_target: {max_target}|> " \
-            f"||max_preds: {max_preds}|> " \
-            f"||Average CER total: {self.CER_total.average()}|> " \
-            f"||Average ave_total_loss: {self.ave_total_loss.average()}|> "
-        print(self.summary_string)
-        return npa, n_iter
 
     def train_discriminator(self, gen_hr, imgs_hr, fake, valid):
         self.optimizer_D.zero_grad()
@@ -446,11 +415,11 @@ class esrgan_crnn:
         input_lengths, ocr_loss, log_probs = self.ocr_one_batch_train(images, images_len, plate_encoded,
                                                                       plate_encoded_len)
         # Here we Calculate the Character error rate
-        targets, wer_list = self.calculate_character_error_rate(input_lengths, log_probs, plate_encoded)
+        targets, wer_list = self.ocr_calculate_character_error_rate(input_lengths, log_probs, plate_encoded)
         # Here we save an example together with its decoding and truth
         # Only if it is positive
         if np.average(wer_list) > 0.1:
-            max_elem, max_preds, max_target = self.one_batch_eval(log_probs, targets, wer_list)
+            max_elem, max_preds, max_target = self.ocr_one_batch_eval(log_probs, targets, wer_list)
         # npa, n_iter = self.__ocr_log_progress(batches_done, epoch, images, ocr_loss, max_elem, max_preds, max_target,
         #                                  n_iter, npa, wer_list)
         return n_iter, input_lengths, ocr_loss, log_probs, targets, wer_list, max_elem, max_preds, max_target
@@ -471,20 +440,21 @@ class esrgan_crnn:
         log_probs_lens = torch.full(size=(batch_size,), fill_value=input_len, dtype=torch.int32)
         loss = self.ctc_loss(log_probs, targets, log_probs_lens, target_lengths)
         # Then backward and step
-        loss.backward()
-        self.ocr_optimizer.step()
+        # loss.backward()
+        # self.ocr_optimizer.step()
         # input_lengths, log_probs, loss = lengths, probs, loss1
         return input_lengths, loss, log_probs
 
+    @torch.no_grad()
     def ocr_one_batch_eval(self, log_probs, targets, wer_list):
         # max_value = np.max(wer_list)
         max_elem = np.argmax(wer_list)
         # max_image = images[max_elem].cpu()
         max_target = targets[max_elem]
-        max_target = [self.dataset.decode_dict[x] for x in max_target.tolist()]
+        max_target = [self.hr_crnn_dataset.decode_dict[x] for x in max_target.tolist()]
         max_target = "".join(max_target)
         ou = preds_to_integer(log_probs[:, max_elem, :])
-        max_preds = [self.dataset.decode_dict[x] for x in ou]
+        max_preds = [self.hr_crnn_dataset.decode_dict[x] for x in ou]
         max_preds = "".join(max_preds)
         return max_elem, max_preds, max_target
 

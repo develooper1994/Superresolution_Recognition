@@ -11,9 +11,11 @@ link: http://www.inf.ufpr.br/vri/databases/UFPR-ALPR.zip
 </br></br>
 
 ## Implementation Details
+![Implementation Graph](esrgan_crnn.jpg)
 - It is just a prototype!
 - You should know that dataset class first load all dataset in to ram and starts the process. UFPR-ALPR dataset is a big one and memorizing takes very long time. 
 read -> transform -> assign to preallocated array as an improvement.
+- Takes very long time to complete.
 - [ESRGAN](https://arxiv.org/abs/1809.00219): it has 3 networks.
 - Ocr model has a attention and ctc loss based architecture. it has 1 networks.. Output channels order have to change.
 - There is 4 different networks have to be trained.

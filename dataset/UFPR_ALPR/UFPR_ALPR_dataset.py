@@ -4,13 +4,11 @@ import os
 import string
 from os import walk, path
 from os.path import splitext, basename
-from path import Path
 
-import numpy as np
 import cv2
-from PIL import Image
-
-from torch.utils.data import Dataset, DataLoader
+import numpy as np
+from path import Path
+from torch.utils.data import Dataset
 
 
 class UFPR_ALPR_dataset(Dataset):

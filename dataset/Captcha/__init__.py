@@ -1,1 +1,1 @@
-from .CaptchaDataset import *
+from .CaptchaDataset import CaptchaDataset

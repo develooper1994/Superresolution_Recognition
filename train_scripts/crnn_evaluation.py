@@ -3,6 +3,9 @@ import numpy as np
 import torch
 
 
+plt.show(block=False)
+
+
 def wer(preds, labels):
     d = np.zeros((len(preds) + 1) * (len(labels) + 1), dtype=np.uint8)
     d = d.reshape((len(preds) + 1, len(labels) + 1))

@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
-from torchvision.models import vgg19
-
 from timm.models.layers import Mish
+from torchvision.models import vgg19
 
 
 class FeatureExtractor(nn.Module):
