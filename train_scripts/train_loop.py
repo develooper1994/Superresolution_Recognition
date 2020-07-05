@@ -109,8 +109,7 @@ class train_loop(metaclass=ABCMeta):
         print(opt)
         return opt
 
-    def network_initializers(self, hr_shape):
-        use_LeakyReLU_Mish = False
+    def network_initializers(self, hr_shape, use_LeakyReLU_Mish=False):
         generator = GeneratorRRDB(self.opt.channels, filters=64, num_res_blocks=self.opt.residual_blocks,
                                   use_LeakyReLU_Mish=use_LeakyReLU_Mish).to(self.device, non_blocking=True)
         discriminator = Discriminator(input_shape=(self.opt.channels, *hr_shape),

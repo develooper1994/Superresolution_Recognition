@@ -164,10 +164,10 @@ except:
 
 
 class crnn(train_loop):
-    def __init__(self, epoch=0, n_epochs=200, dataset_name="dataset", batch_size=4, npa=1, lr=5e-4, eta_min=1e-6,
-                 b1=0.9, b2=0.999, decay_epoch=100, n_cpu=4, hr_height=256, hr_width=256, channels=3,
-                 sample_interval=100, checkpoint_interval=100, residual_blocks=23, warmup_batches=500, lambda_adv=5e-3,
-                 lambda_pixel=1e-2):
+    def __init__(self, epoch=0, n_epochs=200, dataset_name=r"D:\PycharmProjects\ocr_toolkit\UFPR-ALPR dataset",
+                 batch_size=4, npa=1, lr=5e-4, eta_min=1e-6, b1=0.9, b2=0.999, decay_epoch=100, n_cpu=4, hr_height=256,
+                 hr_width=256, channels=3, sample_interval=100, checkpoint_interval=100, residual_blocks=23,
+                 warmup_batches=500, lambda_adv=5e-3, lambda_pixel=1e-2):
         # super().__init__(epoch=epoch, n_epochs=n_epochs, dataset_name=dataset_name, batch_size=batch_size, lr=lr, b1=b1,
         #                  b2=b2, decay_epoch=decay_epoch, n_cpu=n_cpu, hr_height=hr_height, hr_width=hr_width,
         #                  channels=channels, sample_interval=sample_interval, checkpoint_interval=checkpoint_interval,
@@ -183,9 +183,10 @@ class crnn(train_loop):
     def __call__(self, *args, **kwargs):
         self.crnn_train()
 
-    def reload(self, b1, b2, batch_size, channels, checkpoint_interval, dataset_name, decay_epoch, epoch, eta_min,
-               hr_height, hr_width, lambda_adv, lambda_pixel, lr, n_cpu, n_epochs, npa, residual_blocks,
-               sample_interval, warmup_batches):
+    def reload(self, epoch=0, n_epochs=200, dataset_name=r"D:\PycharmProjects\ocr_toolkit\UFPR-ALPR dataset",
+               batch_size=4, npa=1, lr=5e-4, eta_min=1e-6, b1=0.9, b2=0.999, decay_epoch=100, n_cpu=4, hr_height=256,
+               hr_width=256, channels=3, sample_interval=100, checkpoint_interval=100, residual_blocks=23,
+               warmup_batches=500, lambda_adv=5e-3, lambda_pixel=1e-2):
         self.parser = argparse.ArgumentParser()
         self.opt = self.__commandline_interface(epoch=epoch, n_epochs=n_epochs, dataset_name=dataset_name,
                                                 batch_size=batch_size, npa=npa, lr=lr, eta_min=eta_min,
@@ -203,7 +204,7 @@ class crnn(train_loop):
         ## Loss
         self.ctc_loss = self.losses()
         ## Optimizer: Good initial is 5e5
-        self.ocr_optimizer, self.ocr_cosine_learning_rate_scheduler = self.optimizers(eta_min, lr)
+        self.ocr_optimizer, self.ocr_cosine_learning_rate_scheduler = self.optimizers(eta_min)
         ## We keep track of the Average loss and CER
         self.ave_total_loss = AverageMeter()
         self.CER_total = AverageMeter()
@@ -217,7 +218,7 @@ class crnn(train_loop):
         #     Resize((29, 73), Image.BICUBIC),
         #     ToTensor()
         # ])
-        root = Path(r"D:\PycharmProjects\ocr_toolkit\UFPR-ALPR dataset")
+        root = Path(self.opt.dataset_name)
         self.dataset = UFPR_ALPR_dataset(root, dataset_type="__train", transform=self.transforms)
         self.dataloader = DataLoader(
             self.dataset,
@@ -238,9 +239,9 @@ class crnn(train_loop):
         ctc_loss = nn.CTCLoss(blank=0, reduction="mean").to(self.device)
         return ctc_loss
 
-    def optimizers(self, eta_min, lr):
-        ocr_optimizer = optim.Adam(self.ocr_model.parameters(), lr=lr)
-        ocr_cosine_learning_rate_scheduler = CosineAnnealingLR(optimizer=ocr_optimizer, T_max=250000, eta_min=eta_min)
+    def optimizers(self):
+        ocr_optimizer = optim.Adam(self.ocr_model.parameters(), lr=self.opt.lr)
+        ocr_cosine_learning_rate_scheduler = CosineAnnealingLR(optimizer=ocr_optimizer, T_max=250000, eta_min=self.opt.eta_min)
         return ocr_optimizer, ocr_cosine_learning_rate_scheduler
 
     def __commandline_interface(self, epoch=0, n_epochs=200, dataset_name="dataset", batch_size=4, npa=1,
@@ -287,34 +288,38 @@ class crnn(train_loop):
         n_iter = 0
         npa = self.opt.npa
         max_elem, max_preds, max_target = 0, 0, 0
-        input_lengths, loss, log_probs = 0, 0, 0
         for epoch in range(self.opt.epoch, self.opt.n_epochs):
             print("Epoch:", epoch, "started")
             for i, ge in enumerate(self.dataloader):
+
+                batches_done = epoch * len(self.dataloader) + i
+
+                # Configure model input
                 images, plate_encoded, images_len, plate_encoded_len = ge
                 images = images.to(self.device, non_blocking=True)
                 plate_encoded = plate_encoded.to(self.device, non_blocking=True)
 
-                batches_done = epoch * len(self.dataloader) + i
-
                 # to avoid OOM
                 if images.shape[3] <= 800:
 
-                    # one_batch_train
-                    input_lengths, loss, log_probs = self.one_batch_train(images, images_len, plate_encoded, plate_encoded_len)
-
-                    # Here we Calculate the Character error rate
-                    targets, wer_list = self.calculate_character_error_rate(input_lengths, log_probs, plate_encoded)
-
-                    # Here we save an example together with its decoding and truth
-                    # Only if it is positive
-
-                    if np.average(wer_list) > 0.1:
-                        max_elem, max_preds, max_target = self.one_batch_eval(log_probs, targets, wer_list)
-
-                    n_iter = self.__log_progress(batches_done, epoch, images, loss, max_elem, max_preds, max_target,
-                                                 n_iter, npa, wer_list)
+                    n_iter, input_lengths, loss, log_probs, max_elem, max_preds, max_target = \
+                        self.ocr_one_batch(batches_done, epoch, images, images_len, max_elem, max_preds, max_target,
+                                           n_iter, npa, plate_encoded, plate_encoded_len)
         print(self.CER_total.average())
+
+    def ocr_one_batch(self, batches_done, epoch, images, images_len, max_elem, max_preds, max_target, n_iter, npa,
+                      plate_encoded, plate_encoded_len):
+        # one_batch_train
+        input_lengths, loss, log_probs = self.one_batch_train(images, images_len, plate_encoded, plate_encoded_len)
+        # Here we Calculate the Character error rate
+        targets, wer_list = self.calculate_character_error_rate(input_lengths, log_probs, plate_encoded)
+        # Here we save an example together with its decoding and truth
+        # Only if it is positive
+        if np.average(wer_list) > 0.1:
+            max_elem, max_preds, max_target = self.one_batch_eval(log_probs, targets, wer_list)
+        npa, n_iter = self.__log_progress(batches_done, epoch, images, loss, max_elem, max_preds, max_target,
+                                     n_iter, npa, wer_list)
+        return n_iter, input_lengths, loss, log_probs, max_elem, max_preds, max_target
 
     def __log_progress(self, batches_done, epoch, images, loss, max_elem, max_preds, max_target, n_iter, npa, wer_list):
         self.ave_total_loss.update(loss.data.item())
@@ -357,7 +362,7 @@ class crnn(train_loop):
             f"||Average ave_total_loss: {self.ave_total_loss.average()}|> "
         print(self.summary_string)
 
-        return n_iter
+        return npa, n_iter
 
     def one_batch_train(self, images, images_len, plate_encoded, plate_encoded_len):
         # DONT FORGET THE ZERO GRAD!!!!
