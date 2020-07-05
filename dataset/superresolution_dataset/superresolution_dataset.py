@@ -51,6 +51,7 @@ class ImageDataset_superresolution(Dataset):
         # ## torchvision
         # self.lr_transform = transforms.Compose(
         #     [
+        # #       transforms.ToPILImage(),
         #         transforms.Resize((hr_height // 4, hr_height // 4), Image.BICUBIC),
         #         transforms.ToTensor(),
         #         transforms.Normalize(mean, std),
@@ -58,6 +59,7 @@ class ImageDataset_superresolution(Dataset):
         # )
         # self.hr_transform = transforms.Compose(
         #     [
+        # #       transforms.ToPILImage(),
         #         transforms.Resize((hr_height, hr_height), Image.BICUBIC),
         #         transforms.ToTensor(),
         #         transforms.Normalize(mean, std),
