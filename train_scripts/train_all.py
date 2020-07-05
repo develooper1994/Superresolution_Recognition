@@ -222,8 +222,8 @@ class esrgan_crnn:
         max_elem, max_preds, max_target = 0, 0, 0
         for epoch in range(self.opt.epoch, self.opt.n_epochs):
             print("Epoch:", epoch, "started")
-            for i, ge_lr, ge_hr in enumerate(self.lr_crnn_dataloader, self.hr_crnn_dataloader):
-                batches_done = epoch * len(self.dataloader) + i
+            for i, ge_lr, ge_hr in enumerate(zip(self.lr_crnn_dataloader, self.hr_crnn_dataloader)):
+                batches_done = epoch * len(self.lr_crnn_dataloader) + i
                 images_lr, plate_encoded, images_len, plate_encoded_len = ge_lr
                 images_hr, plate_encoded, images_len, plate_encoded_len = ge_hr
                 # Configure model input
