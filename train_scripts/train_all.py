@@ -1,10 +1,10 @@
 import warnings
 
-warnings.simplefilter(action='ignore', category=FutureWarning)
-warnings.simplefilter(action='ignore', category=DeprecationWarning)
-warnings.simplefilter(action='ignore', category=UserWarning)
-warnings.simplefilter("ignore")
-warnings.filterwarnings("ignore")
+# warnings.simplefilter(action='ignore', category=FutureWarning)
+# warnings.simplefilter(action='ignore', category=DeprecationWarning)
+# warnings.simplefilter(action='ignore', category=UserWarning)
+# warnings.simplefilter("ignore")
+# warnings.filterwarnings("ignore")
 
 import argparse
 import os
@@ -291,11 +291,6 @@ class esrgan_crnn:
                     #  Log Progress
                     # --------------
 
-                    # self.__esrgan_log_progress(i, batches_done, epoch, gen_hr, imgs_lr, loss_D, loss_G, loss_GAN,
-                    #                            loss_content,
-                    #                            loss_pixel)
-
-                    # log the all progress
                     self.ave_total_loss.update(ocr_loss.data.item())
                     self.writer.add_scalar("total_loss", self.ave_total_loss.average(), n_iter)
                     if np.average(wer_list) > 0.1:
@@ -432,11 +427,10 @@ class esrgan_crnn:
         targets = plate_encoded.to(self.device)  # .cpu()
         # Get the Lengths/2 becase this is how much we downsample the width
         input_lengths = images_len / 2
-        target_lengths = plate_encoded_len
         # Get the CTC Loss
         input_len, batch_size, vocab_size = log_probs.size()
         log_probs_lens = torch.full(size=(batch_size,), fill_value=input_len, dtype=torch.int32)
-        loss = self.ctc_loss(log_probs, targets, log_probs_lens, target_lengths)
+        loss = self.ctc_loss(log_probs, targets, log_probs_lens, plate_encoded_len)
         # Then backward and step
         # loss.backward()
         # self.ocr_optimizer.step()
