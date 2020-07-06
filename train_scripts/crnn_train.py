@@ -375,17 +375,17 @@ class crnn(train_loop):
         targets = plate_encoded.to(self.device)  # .cpu()
         # Get the Lengths/2 becase this is how much we downsample the width
         input_lengths = images_len / 2
-        target_lengths = plate_encoded_len
         # Get the CTC Loss
         input_len, batch_size, vocab_size = log_probs.size()
         log_probs_lens = torch.full(size=(batch_size,), fill_value=input_len, dtype=torch.int32)
-        loss = self.ctc_loss(log_probs, targets, log_probs_lens, target_lengths)
+        loss = self.ctc_loss(log_probs, targets, log_probs_lens, plate_encoded_len)
         # Then backward and step
         loss.backward()
         self.ocr_optimizer.step()
         # input_lengths, log_probs, loss = lengths, probs, loss1
         return input_lengths, loss, log_probs
 
+    @torch.no_grad()
     def one_batch_eval(self, log_probs, targets, wer_list):
         # max_value = np.max(wer_list)
         max_elem = np.argmax(wer_list)

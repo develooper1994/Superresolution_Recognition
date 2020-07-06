@@ -15,7 +15,7 @@ class depthwise_separable_conv_bn(nn.Module):
         super(depthwise_separable_conv_bn, self).__init__()
         self.depthwise = nn.Conv2d(nin, nin, kernel_size=ks, padding=p, groups=nin, bias=False)
         self.bnorm = BatchNorm2d(nin)
-        self.pointwise = nn.Conv2d(nin, nout, kernel_size=1)
+        self.pointwise = nn.Conv2d(nin, nout, kernel_size=1)  # 1x1
 
     def forward(self, x):
         out = self.depthwise(x)
@@ -39,7 +39,7 @@ class attention_block(nn.Module):
             self.reduce_residual = nn.Conv2d(input_channels, output_channels, kernel_size=1)
             self.residual = True
 
-        self.reduce1 = nn.Conv2d(input_channels, reduce_dim, kernel_size=1)
+        self.reduce1 = nn.Conv2d(input_channels, reduce_dim, kernel_size=1)  # 1x1
         self.conv1 = depthwise_separable_conv_bn(reduce_dim, reduce_dim)
 
         self.el = nn.ELU()
@@ -126,8 +126,8 @@ class cnn_attention_ocr(nn.Module):
 
         self.conv1 = depthwise_separable_conv_bn(16, 16, 13, 6)
 
-        self.reduce1 = nn.Conv2d(self.input_dim, 16, kernel_size=1)
-        self.reduce2 = nn.Conv2d(model_dim * 8, self.classes, kernel_size=1)
+        self.reduce1 = nn.Conv2d(self.input_dim, 16, kernel_size=1)  # 1x1
+        self.reduce2 = nn.Conv2d(model_dim * 8, self.classes, kernel_size=1)  # 1x1
 
         self.drop1 = nn.Dropout2d(0.75)
         self.drop2 = nn.Dropout2d(0.5)
