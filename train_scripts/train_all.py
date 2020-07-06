@@ -1,4 +1,5 @@
 import warnings
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=DeprecationWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
@@ -30,12 +31,11 @@ from models.esrgan_models import FeatureExtractor, GeneratorRRDB, \
 from train_scripts.crnn_evaluation import wer_eval, preds_to_integer, AverageMeter
 
 
-warmup_batches=500
 class esrgan_crnn:
     def __init__(self, epoch=0, n_epochs=200, dataset_name=r"D:\PycharmProjects\ocr_toolkit\UFPR-ALPR dataset",
                  batch_size=4, npa=1, lr=0.0002, eta_min=1e-6, b1=0.9, b2=0.999, decay_epoch=100, n_cpu=8, hr_height=32,
                  hr_width=80, channels=3, sample_interval=100, checkpoint_interval=100, residual_blocks=23,
-                 warmup_batches=0, lambda_adv=5e-3, lambda_pixel=1e-2):
+                 warmup_batches=500, lambda_adv=5e-3, lambda_pixel=1e-2):
         os.makedirs("ocr_images/training", exist_ok=True)
         os.makedirs("ocr_saved/models", exist_ok=True)
 
@@ -107,10 +107,9 @@ class esrgan_crnn:
             ]
         )
         root = Path(self.opt.dataset_name)
-        index_maximum = 10
+        index_maximum = 10  # debug purpose
         self.lr_crnn_dataset = UFPR_ALPR_dataset(data_path=root, dataset_type="__train",
-                                                 transform=self.lr_crnn_transforms,
-                                                 index_maximum=index_maximum)
+                                                 transform=self.lr_crnn_transforms)  # ,index_maximum=index_maximum
         self.lr_crnn_dataloader = DataLoader(
             self.lr_crnn_dataset,
             batch_size=self.opt.batch_size,
@@ -119,8 +118,7 @@ class esrgan_crnn:
             pin_memory=True,
         )
         self.hr_crnn_dataset = UFPR_ALPR_dataset(data_path=root, dataset_type="__train",
-                                                 transform=self.hr_crnn_transforms,
-                                                 index_maximum=index_maximum)
+                                                 transform=self.hr_crnn_transforms)  # ,index_maximum=index_maximum
         self.hr_crnn_dataloader = DataLoader(
             self.hr_crnn_dataset,
             batch_size=self.opt.batch_size,
